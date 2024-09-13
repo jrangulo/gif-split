@@ -1,0 +1,16 @@
+package web
+
+templ ImageTableTemplate(gridGIFs [][]string) {
+	<div>
+		<h2>Resulting GIF Grid</h2>
+		<table>
+			for _, row := range gridGIFs {
+				<tr>
+					for _, image := range row {
+						<td><img src={ "data:image/gif;base64," + image } style="display: block"/></td>
+					}
+				</tr>
+			}
+		</table>
+	</div>
+}

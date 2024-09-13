@@ -1,0 +1,37 @@
+package web
+
+templ BaseTemplate() {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>GIF Splitter</title>
+			<script src="/static/htmx.min.js"></script>
+		</head>
+		<body>
+			<main>
+				{ children... }
+			</main>
+		</body>
+	</html>
+}
+
+templ UploadFormTemplate() {
+	@BaseTemplate() {
+		<h1>Upload an Animated GIF</h1>
+		<form hx-post="/upload" hx-target="#result" hx-encoding="multipart/form-data" hx-trigger="submit" hx-swap="innerHTML">
+			<label>Choose a GIF: <input type="file" name="gifFile" accept="image/gif" required/></label>
+			<br/>
+			<br/>
+			<label>Rows (N): <input type="number" name="rows" value="2" min="1" required/></label>
+			<br/>
+			<br/>
+			<label>Columns (M): <input type="number" name="cols" value="2" min="1" required/></label>
+			<br/>
+			<br/>
+			<button>Split GIF</button>
+		</form>
+		<div id="result"></div>
+	}
+}

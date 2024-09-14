@@ -6,7 +6,7 @@ go run main.go
 ```
 
 ## Dependecies used
-- [Templ](https://github.com/a-h/templ) For creating dynamic html from the server
+- [Templ](https://github.com/a-h/templ) For creating dynamic html on the server
 - [htmx](https://htmx.org/) For rendering/fetching on the client
 
 

@@ -78,55 +78,53 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func processGIF(file io.Reader, rows, cols int) ([][]string, error) {
-	g, err := gif.DecodeAll(file)
-	if err != nil {
-		return nil, err
-	}
+    g, err := gif.DecodeAll(file)
+    if err != nil {
+        return nil, err
+    }
 
-	totalFrames := len(g.Image)
-	frameWidth := g.Config.Width
-	frameHeight := g.Config.Height
-	cellWidth := frameWidth / cols
-	cellHeight := frameHeight / rows
+    frameWidth := g.Config.Width
+    frameHeight := g.Config.Height
+    cellWidth := frameWidth / cols
+    cellHeight := frameHeight / rows
 
-	gridGIFs := make([][]string, rows)
-	for i := range gridGIFs {
-		gridGIFs[i] = make([]string, cols)
-	}
+    gridGIFs := make([][]string, rows)
+    for i := range gridGIFs {
+        gridGIFs[i] = make([]string, cols)
+    }
 
-	for row := 0; row < rows; row++ {
-		for col := 0; col < cols; col++ {
-			newGIF := &gif.GIF{
-				Image:     []*image.Paletted{},
-				Delay:     g.Delay,
-				LoopCount: g.LoopCount,
-			}
+    for row := 0; row < rows; row++ {
+        for col := 0; col < cols; col++ {
+            rect := image.Rect(
+                col*cellWidth,
+                row*cellHeight,
+                (col+1)*cellWidth,
+                (row+1)*cellHeight,
+            )
 
-			for frameIndex := 0; frameIndex < totalFrames; frameIndex++ {
-				rect := image.Rect(
-					col*cellWidth,
-					row*cellHeight,
-					(col+1)*cellWidth,
-					(row+1)*cellHeight,
-				)
+            newGIF := &gif.GIF{
+                Image:     make([]*image.Paletted, len(g.Image)),
+                Delay:     make([]int, len(g.Delay)),
+                LoopCount: g.LoopCount,
+            }
 
-				srcImg := g.Image[frameIndex]
-				dstImg := image.NewPaletted(image.Rect(0, 0, cellWidth, cellHeight), srcImg.Palette)
-				draw.Draw(dstImg, dstImg.Rect, srcImg, rect.Min, draw.Over)
+            for i, srcImg := range g.Image {
+                dstImg := image.NewPaletted(image.Rect(0, 0, cellWidth, cellHeight), srcImg.Palette)
+                draw.Draw(dstImg, dstImg.Rect, srcImg, rect.Min, draw.Over)
+                newGIF.Image[i] = dstImg
+                newGIF.Delay[i] = g.Delay[i]
+            }
 
-				newGIF.Image = append(newGIF.Image, dstImg)
-			}
+            buf := new(bytes.Buffer)
+            err := gif.EncodeAll(buf, newGIF)
+            if err != nil {
+                return nil, err
+            }
 
-			buf := new(bytes.Buffer)
-			err := gif.EncodeAll(buf, newGIF)
-			if err != nil {
-				return nil, err
-			}
+            encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+            gridGIFs[row][col] = encoded
+        }
+    }
 
-			encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
-			gridGIFs[row][col] = encoded
-		}
-	}
-
-	return gridGIFs, nil
+    return gridGIFs, nil
 }

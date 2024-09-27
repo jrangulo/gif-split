@@ -87,48 +87,60 @@ func processGIF(file io.Reader, rows, cols int) ([][]string, error) {
 		gridGIFs[i] = make([]string, cols)
 	}
 
+	type result struct {
+		row, col int
+		encoded  string
+		err      error
+	}
+	resultChan := make(chan result, rows*cols)
+
 	for row := 0; row < rows; row++ {
 		for col := 0; col < cols; col++ {
-			rect := image.Rect(
-				col*cellWidth,
-				row*cellHeight,
-				(col+1)*cellWidth,
-				(row+1)*cellHeight,
-			)
-			newGIF := &gif.GIF{
-				Image:     make([]*image.Paletted, len(g.Image)),
-				Delay:     make([]int, len(g.Delay)),
-				LoopCount: g.LoopCount,
-				Disposal:  make([]byte, len(g.Disposal)),
-			}
-
-			var lastImg *image.Paletted
-
-			for i, srcImg := range g.Image {
-				dstImg := image.NewPaletted(image.Rect(0, 0, cellWidth, cellHeight), g.Image[0].Palette)
-
-				if lastImg != nil && g.Disposal[i-1] != gif.DisposalBackground {
-					draw.Draw(dstImg, dstImg.Rect, lastImg, image.Point{}, draw.Src)
+			go func(row, col int) {
+				rect := image.Rect(
+					col*cellWidth,
+					row*cellHeight,
+					(col+1)*cellWidth,
+					(row+1)*cellHeight,
+				)
+				newGIF := &gif.GIF{
+					Image:     make([]*image.Paletted, len(g.Image)),
+					Delay:     make([]int, len(g.Delay)),
+					LoopCount: g.LoopCount,
+					Disposal:  make([]byte, len(g.Disposal)),
 				}
-
-				draw.Draw(dstImg, dstImg.Rect, srcImg, rect.Min, draw.Over)
-
-				newGIF.Image[i] = dstImg
-				newGIF.Delay[i] = g.Delay[i]
-				newGIF.Disposal[i] = g.Disposal[i]
-
-				lastImg = dstImg
-			}
-
-			buf := new(bytes.Buffer)
-			err := gif.EncodeAll(buf, newGIF)
-			if err != nil {
-				return nil, err
-			}
-			encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
-			gridGIFs[row][col] = encoded
+				var lastImg *image.Paletted
+				for i, srcImg := range g.Image {
+					dstImg := image.NewPaletted(image.Rect(0, 0, cellWidth, cellHeight), g.Image[0].Palette)
+					if lastImg != nil && g.Disposal[i-1] != gif.DisposalBackground {
+						draw.Draw(dstImg, dstImg.Rect, lastImg, image.Point{}, draw.Src)
+					}
+					draw.Draw(dstImg, dstImg.Rect, srcImg, rect.Min, draw.Over)
+					newGIF.Image[i] = dstImg
+					newGIF.Delay[i] = g.Delay[i]
+					newGIF.Disposal[i] = g.Disposal[i]
+					lastImg = dstImg
+				}
+				buf := new(bytes.Buffer)
+				err := gif.EncodeAll(buf, newGIF)
+				if err != nil {
+					resultChan <- result{row: row, col: col, err: err}
+					return
+				}
+				encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
+				resultChan <- result{row: row, col: col, encoded: encoded}
+			}(row, col)
 		}
 	}
+
+	for i := 0; i < rows*cols; i++ {
+		res := <-resultChan
+		if res.err != nil {
+			return nil, res.err
+		}
+		gridGIFs[res.row][res.col] = res.encoded
+	}
+
 	return gridGIFs, nil
 }
 

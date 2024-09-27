@@ -78,12 +78,10 @@ func processGIF(file io.Reader, rows, cols int) ([][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	frameWidth := g.Config.Width
 	frameHeight := g.Config.Height
 	cellWidth := frameWidth / cols
 	cellHeight := frameHeight / rows
-
 	gridGIFs := make([][]string, rows)
 	for i := range gridGIFs {
 		gridGIFs[i] = make([]string, cols)
@@ -97,18 +95,29 @@ func processGIF(file io.Reader, rows, cols int) ([][]string, error) {
 				(col+1)*cellWidth,
 				(row+1)*cellHeight,
 			)
-
 			newGIF := &gif.GIF{
 				Image:     make([]*image.Paletted, len(g.Image)),
 				Delay:     make([]int, len(g.Delay)),
 				LoopCount: g.LoopCount,
+				Disposal:  make([]byte, len(g.Disposal)),
 			}
 
+			var lastImg *image.Paletted
+
 			for i, srcImg := range g.Image {
-				dstImg := image.NewPaletted(image.Rect(0, 0, cellWidth, cellHeight), srcImg.Palette)
+				dstImg := image.NewPaletted(image.Rect(0, 0, cellWidth, cellHeight), g.Image[0].Palette)
+
+				if lastImg != nil && g.Disposal[i-1] != gif.DisposalBackground {
+					draw.Draw(dstImg, dstImg.Rect, lastImg, image.Point{}, draw.Src)
+				}
+
 				draw.Draw(dstImg, dstImg.Rect, srcImg, rect.Min, draw.Over)
+
 				newGIF.Image[i] = dstImg
 				newGIF.Delay[i] = g.Delay[i]
+				newGIF.Disposal[i] = g.Disposal[i]
+
+				lastImg = dstImg
 			}
 
 			buf := new(bytes.Buffer)
@@ -116,11 +125,10 @@ func processGIF(file io.Reader, rows, cols int) ([][]string, error) {
 			if err != nil {
 				return nil, err
 			}
-
 			encoded := base64.StdEncoding.EncodeToString(buf.Bytes())
 			gridGIFs[row][col] = encoded
 		}
 	}
-
 	return gridGIFs, nil
 }
+
